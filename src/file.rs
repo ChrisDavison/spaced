@@ -1,6 +1,42 @@
 use anyhow::{anyhow, Error, Result};
 use chrono::prelude::*;
 
+#[derive(Debug, PartialEq)]
+pub struct SpacedTask {
+    pub name: String,
+    pub date: chrono::NaiveDate,
+    pub interval: usize,
+    pub modifier: f32,
+}
+
+pub fn parse() -> Vec<SpacedTask> {
+    vec![]
+}
+
+impl std::str::FromStr for SpacedTask {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split(",").clone().collect();
+        let name = parts[0];
+        dbg!(&parts[1]);
+        let dateparts = parts[1].split("-").collect::<Vec<&str>>();
+        let date = NaiveDate::from_ymd(
+            dateparts[0].parse()?,
+            dateparts[1].parse()?,
+            dateparts[2].parse()?,
+        );
+        let interval = interval_days(&parts[2])?;
+        let modifier = parts[3].parse()?;
+        Ok(SpacedTask {
+            name: name.to_string(),
+            date,
+            interval,
+            modifier,
+        })
+    }
+}
+
 fn interval_days(s: &str) -> Result<usize> {
     let mut cur_num = String::new();
     for ch in s.chars() {
@@ -21,20 +57,22 @@ fn interval_days(s: &str) -> Result<usize> {
     Err(anyhow!("Didn't get proper format. Expected <usize>d"))
 }
 
-pub struct SpacedTask {
-    pub name: String,
-    pub date: chrono::DateTime<Utc>,
-    pub interval: usize,
-    pub modifier: f32,
-}
-
-pub fn parse() -> Vec<SpacedTask> {
-    vec![]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_entry_test() {
+        let line = "guitar,2022-10-01,1d,2.5";
+        let want = SpacedTask {
+            name: String::from("guitar"),
+            date: Utc.ymd(2022, 10, 1).naive_utc(),
+            interval: 1,
+            modifier: 2.5,
+        };
+        let got: SpacedTask = line.parse().unwrap();
+        assert_eq!(got, want);
+    }
 
     #[test]
     fn parse_schedule_test() {
