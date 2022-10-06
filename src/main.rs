@@ -15,10 +15,15 @@ struct Args {
 #[derive(StructOpt, Debug)]
 #[structopt(about = "space task revisits")]
 enum Command {
+    /// Add a new task, due today
     Add { title: String },
+    /// Update a task one step
     Update { index: usize },
+    /// Repeat task using current step
     Repeat { index: usize },
+    /// Repeat task using the previous step
     Hard { index: usize },
+    /// View tasks
     View,
 }
 
