@@ -10,6 +10,7 @@ use structopt::StructOpt;
 struct Args {
     #[structopt(subcommand)]
     cmd: Command,
+    filename: String,
 }
 
 #[derive(StructOpt, Debug)]
@@ -29,8 +30,8 @@ enum Command {
 
 fn main() {
     let args = Args::from_args();
-    let filename = "local.txt";
-    let mut tasks = match file::get_tasks(filename) {
+    let filename = args.filename;
+    let mut tasks = match file::get_tasks(&filename) {
         Ok(t) => t,
         Err(e) => {
             eprintln!("{}", e);
@@ -44,7 +45,7 @@ fn main() {
         Command::Update { index } => tasks[index].update(),
         Command::View => view(&tasks),
     }
-    if let Err(e) = file::write_tasks(&tasks, filename) {
+    if let Err(e) = file::write_tasks(&tasks, &filename) {
         eprintln!("{e}");
     }
 }

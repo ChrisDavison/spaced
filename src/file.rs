@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn parse_entry_test() {
-        let line = "guitar,2022-10-01,1d";
+        let line = "guitar,2022-10-01,1";
         let want = SpacedTask {
             name: String::from("guitar"),
             date: Utc.ymd(2022, 10, 1).naive_utc(),
@@ -113,24 +113,5 @@ mod tests {
         };
         let got: SpacedTask = line.parse().unwrap();
         assert_eq!(got, want);
-    }
-
-    #[test]
-    fn parse_schedule_test() {
-        let pairs = vec![
-            ("1d", Ok(1)),
-            ("37D", Ok(37)),
-            ("-1d", Err("Negative repeat interval")),
-            ("d", Err("No number")),
-            ("1", Err("Didn't get proper format. Expected <usize>d")),
-        ];
-        for (inp, want) in pairs {
-            match (interval_days(inp), want) {
-                (Ok(a), Ok(b)) => assert_eq!(a, b),
-                (Err(a), Err(b)) => assert_eq!(format!("{}", a), format!("{}", b)),
-                (Ok(a), Err(b)) => assert_eq!(format!("Ok: {}", a), format!("Err: {}", b)),
-                (Err(a), Ok(b)) => assert_eq!(format!("Err: {}", a), format!("Ok: {}", b)),
-            }
-        }
     }
 }
