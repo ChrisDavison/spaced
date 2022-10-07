@@ -21,15 +21,24 @@ struct Args {
 #[structopt(about = "space task revisits")]
 enum Command {
     /// Add a new task, due today
-    Add { title: String },
+    Add {
+        title: String,
+    },
     /// Update a task one step
-    Update { index: usize },
+    Update {
+        index: usize,
+    },
     /// Repeat task using current step
-    Repeat { index: usize },
+    Repeat {
+        index: usize,
+    },
     /// Repeat task using the previous step
-    Hard { index: usize },
+    Hard {
+        index: usize,
+    },
     /// View tasks
     View,
+    Due,
 }
 
 fn main() {
@@ -56,6 +65,7 @@ fn main() {
         Command::Repeat { index } => tasks[index].repeat_interval(),
         Command::Update { index } => tasks[index].increase_interval(&custom_intervals),
         Command::View => view(&tasks),
+        Command::Due => due(&tasks),
     }
     if let Err(e) = file::write_tasks(&tasks, &filename, &custom_intervals) {
         eprintln!("{e}");
@@ -80,5 +90,14 @@ fn add(tasks: &mut Vec<SpacedTask>, title: String) {
 fn view(tasks: &[SpacedTask]) {
     for (i, t) in tasks.iter().enumerate() {
         println!("{i:4}. {t}");
+    }
+}
+
+fn due(tasks: &[SpacedTask]) {
+    let today = Utc::today().naive_utc();
+    for (i, t) in tasks.iter().enumerate() {
+        if t.date <= today {
+            println!("{i:4}. {t}");
+        }
     }
 }
