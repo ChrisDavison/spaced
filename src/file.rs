@@ -2,7 +2,11 @@ use anyhow::{anyhow, Error, Result};
 use chrono::prelude::*;
 
 const MODIFIER: f32 = 2.5;
-const MAX_INTERVAL: usize = 365 * 2;
+lazy_static! {
+    static ref MAX_INTERVAL: usize = std::env::var("SPACED_MAX_INTERVAL")
+        .map(|val| val.parse::<usize>().unwrap_or(365 * 2))
+        .unwrap_or(365 * 2);
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SpacedTask {
@@ -23,7 +27,7 @@ pub fn get_tasks(filename: &str) -> Result<Vec<SpacedTask>> {
     Ok(tasks)
 }
 
-pub fn write_tasks(tasks: &[SpacedTask], filename: &str) -> Result<()> {
+pub fn write_tasks(tasks: &[SpacedTask], filename: &str, custom_intervals: &[usize]) -> Result<()> {
     std::fs::write(
         filename,
         tasks
@@ -57,6 +61,32 @@ impl std::str::FromStr for SpacedTask {
     }
 }
 
+fn next_larger_interval(i: usize, custom_intervals: &[usize]) -> usize {
+    for &thing in custom_intervals {
+        if thing > i {
+            return thing;
+        }
+    }
+    // We didn't find a larger interval, so use the max interval
+    return custom_intervals[custom_intervals.len() - 1];
+}
+
+fn next_smaller_interval(i: usize, custom_intervals: &[usize]) -> usize {
+    let mut interval = 0;
+    for &thing in custom_intervals {
+        if thing > i {
+            break;
+        }
+        interval = thing;
+    }
+    if interval == 0 {
+        // We didn't find a smaller interval, so use the first of custom intervals
+        custom_intervals[0]
+    } else {
+        interval
+    }
+}
+
 impl SpacedTask {
     pub fn new(title: String) -> SpacedTask {
         let added = SpacedTask {
@@ -69,25 +99,33 @@ impl SpacedTask {
         added
     }
 
-    pub fn update(&mut self) {
-        self.interval = ((self.interval as f32 * MODIFIER).ceil() as usize).min(MAX_INTERVAL);
+    pub fn increase_interval(&mut self, custom_intervals: &[usize]) {
+        if !custom_intervals.is_empty() {
+            self.interval = next_larger_interval(self.interval, custom_intervals);
+        } else {
+            self.interval = ((self.interval as f32 * MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
+        }
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Updated: {self}")
     }
 
-    pub fn repeat(&mut self) {
+    pub fn repeat_interval(&mut self) {
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Repeated: {self}")
     }
 
-    pub fn hard(&mut self) {
-        self.interval = ((self.interval as f32 / MODIFIER).ceil() as usize).min(MAX_INTERVAL);
+    pub fn reduce_interval(&mut self, custom_intervals: &[usize]) {
+        if !custom_intervals.is_empty() {
+            self.interval = next_smaller_interval(self.interval, custom_intervals);
+        } else {
+            self.interval = ((self.interval as f32 / MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
+        }
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Hard updated {self}")
     }
 
-    pub fn reset(&mut self) {
-        self.interval = 1;
+    pub fn reset(&mut self, custom_intervals: &[usize]) {
+        self.interval = *custom_intervals.get(0).unwrap_or(&1);
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Reset {self}")
     }
@@ -113,5 +151,32 @@ mod tests {
         };
         let got: SpacedTask = line.parse().unwrap();
         assert_eq!(got, want);
+    }
+
+    #[test]
+    fn increase_task() {
+        let mut task = SpacedTask {
+            name: String::from("guitar"),
+            date: Utc.ymd(2022, 10, 1).naive_utc(),
+            interval: 1,
+        };
+        task.increase_interval(&[]);
+        assert_eq!(task.interval, 3);
+        task.increase_interval(&[]);
+        assert_eq!(task.interval, 8);
+    }
+
+    #[test]
+    fn increase_task_with_custom_intervals() {
+        let customs = vec![1, 7, 365, 720];
+        let mut task = SpacedTask {
+            name: String::from("guitar"),
+            date: Utc.ymd(2022, 10, 1).naive_utc(),
+            interval: 1,
+        };
+        task.increase_interval(&customs);
+        assert_eq!(task.interval, 7);
+        task.increase_interval(&customs);
+        assert_eq!(task.interval, 365);
     }
 }
