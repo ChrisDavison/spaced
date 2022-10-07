@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Error, Result};
 use chrono::prelude::*;
 
-const MODIFIER: f32 = 2.5;
 lazy_static! {
+    static ref MODIFIER: f32 = std::env::var("SPACED_INTERVAL_MODIFIER")
+        .map(|val| val.parse::<f32>().unwrap_or(2.5))
+        .unwrap_or(2.5);
     static ref MAX_INTERVAL: usize = std::env::var("SPACED_MAX_INTERVAL")
         .map(|val| val.parse::<usize>().unwrap_or(365 * 2))
         .unwrap_or(365 * 2);
