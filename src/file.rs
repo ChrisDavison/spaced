@@ -46,17 +46,38 @@ impl std::str::FromStr for SpacedTask {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split(',').clone().collect();
-        let name = parts[0];
-        let dateparts = parts[1].split('-').collect::<Vec<&str>>();
-        let date = NaiveDate::from_ymd(
-            dateparts[0].parse()?,
-            dateparts[1].parse()?,
-            dateparts[2].parse()?,
-        );
-        let interval = parts[2].parse::<usize>()?;
+        let mut name_parts = Vec::new();
+        let mut date = None;
+        let mut interval = None;
+        let parts: Vec<&str> = s.split(' ').collect();
+        for part in s.split(' ') {
+            let mut ch = part.chars();
+            match ch.nth(0).unwrap() {
+                '#' => {
+                    if interval.is_some() {
+                        return Err(anyhow!("Found a second `#...` interval element"));
+                    }
+                    interval = Some(part[1..].parse::<usize>()?)
+                }
+                '@' => {
+                    if date.is_some() {
+                        return Err(anyhow!("Found a second `@...` date element"));
+                    }
+                    let dateparts: Vec<&str> = part[1..].split('-').collect();
+                    date = Some(NaiveDate::from_ymd(
+                        dateparts[0].parse()?,
+                        dateparts[1].parse()?,
+                        dateparts[2].parse()?,
+                    ));
+                }
+                _ => name_parts.push(part),
+            }
+        }
+        let name = name_parts.join(" ").to_string();
+        let date = date.ok_or_else(|| anyhow!("No date in line. Need `#date`"))?;
+        let interval = interval.ok_or_else(|| anyhow!("No interval in line. Need `@interval`"))?;
         Ok(SpacedTask {
-            name: name.to_string(),
+            name,
             date,
             interval,
         })
@@ -105,7 +126,7 @@ impl SpacedTask {
         if !custom_intervals.is_empty() {
             self.interval = next_larger_interval(self.interval, custom_intervals);
         } else {
-            self.interval = ((self.interval as f32 * MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
+            self.interval = ((self.interval as f32 * *MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
         }
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Updated: {self}")
@@ -120,7 +141,7 @@ impl SpacedTask {
         if !custom_intervals.is_empty() {
             self.interval = next_smaller_interval(self.interval, custom_intervals);
         } else {
-            self.interval = ((self.interval as f32 / MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
+            self.interval = ((self.interval as f32 / *MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
         }
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Hard updated {self}")
@@ -135,7 +156,7 @@ impl SpacedTask {
 
 impl std::fmt::Display for SpacedTask {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{},{}", self.name, self.date, self.interval)
+        write!(f, "{} @{} #{}", self.name, self.date, self.interval)
     }
 }
 
@@ -145,9 +166,21 @@ mod tests {
 
     #[test]
     fn parse_entry_test() {
-        let line = "guitar,2022-10-01,1";
+        let line = "guitar @2022-10-01 #1";
         let want = SpacedTask {
             name: String::from("guitar"),
+            date: Utc.ymd(2022, 10, 1).naive_utc(),
+            interval: 1,
+        };
+        let got: SpacedTask = line.parse().unwrap();
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn parse_entry_with_comma_test() {
+        let line = "guitar, i see fire (backwards) @2022-10-01 #1";
+        let want = SpacedTask {
+            name: String::from("guitar, i see fire (backwards)"),
             date: Utc.ymd(2022, 10, 1).naive_utc(),
             interval: 1,
         };
