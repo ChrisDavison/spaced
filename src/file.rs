@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Error, Result};
 use chrono::prelude::*;
+use std::path::Path;
 
 lazy_static! {
     static ref MODIFIER: f32 = std::env::var("SPACED_INTERVAL_MODIFIER")
@@ -19,6 +20,9 @@ pub struct SpacedTask {
 
 pub fn get_tasks(filename: &str) -> Result<Vec<SpacedTask>> {
     let mut tasks = Vec::new();
+    if !Path::exists(Path::new(filename)) {
+        std::fs::File::create(filename)?;
+    }
     let contents = std::fs::read_to_string(filename)?;
     for line in contents.lines() {
         if line.is_empty() {
@@ -52,7 +56,7 @@ impl std::str::FromStr for SpacedTask {
         let parts: Vec<&str> = s.split(' ').collect();
         for part in s.split(' ') {
             let mut ch = part.chars();
-            match ch.nth(0).unwrap() {
+            match ch.next().unwrap() {
                 '#' => {
                     if interval.is_some() {
                         return Err(anyhow!("Found a second `#...` interval element"));
@@ -73,7 +77,7 @@ impl std::str::FromStr for SpacedTask {
                 _ => name_parts.push(part),
             }
         }
-        let name = name_parts.join(" ").to_string();
+        let name = name_parts.join(" ");
         let date = date.ok_or_else(|| anyhow!("No date in line. Need `#date`"))?;
         let interval = interval.ok_or_else(|| anyhow!("No interval in line. Need `@interval`"))?;
         Ok(SpacedTask {
@@ -91,7 +95,7 @@ fn next_larger_interval(i: usize, custom_intervals: &[usize]) -> usize {
         }
     }
     // We didn't find a larger interval, so use the max interval
-    return custom_intervals[custom_intervals.len() - 1];
+    custom_intervals[custom_intervals.len() - 1]
 }
 
 fn next_smaller_interval(i: usize, custom_intervals: &[usize]) -> usize {
@@ -111,10 +115,10 @@ fn next_smaller_interval(i: usize, custom_intervals: &[usize]) -> usize {
 }
 
 impl SpacedTask {
-    pub fn new(title: String) -> SpacedTask {
+    pub fn new(title: String, date: Option<NaiveDate>) -> SpacedTask {
         let added = SpacedTask {
             name: title,
-            date: Utc::now().date_naive(),
+            date: date.unwrap_or(Utc::now().date_naive()),
             interval: 1,
         };
 
@@ -148,7 +152,7 @@ impl SpacedTask {
     }
 
     pub fn reset(&mut self, custom_intervals: &[usize]) {
-        self.interval = *custom_intervals.get(0).unwrap_or(&1);
+        self.interval = *custom_intervals.first().unwrap_or(&1);
         self.date += chrono::Duration::days(self.interval as i64);
         println!("Reset {self}")
     }
