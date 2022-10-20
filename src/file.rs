@@ -1,22 +1,7 @@
+use crate::spacedtask::SpacedTask;
 use anyhow::{anyhow, Error, Result};
 use chrono::prelude::*;
 use std::path::Path;
-
-lazy_static! {
-    static ref MODIFIER: f32 = std::env::var("SPACED_INTERVAL_MODIFIER")
-        .map(|val| val.parse::<f32>().unwrap_or(2.5))
-        .unwrap_or(2.5);
-    static ref MAX_INTERVAL: usize = std::env::var("SPACED_MAX_INTERVAL")
-        .map(|val| val.parse::<usize>().unwrap_or(365 * 2))
-        .unwrap_or(365 * 2);
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct SpacedTask {
-    pub name: String,
-    pub date: chrono::NaiveDate,
-    pub interval: usize,
-}
 
 pub fn get_tasks(filename: &str) -> Result<Vec<SpacedTask>> {
     let mut tasks = Vec::new();
@@ -54,6 +39,7 @@ impl std::str::FromStr for SpacedTask {
         let mut date = None;
         let mut interval = None;
         let parts: Vec<&str> = s.split(' ').collect();
+        dbg!(parts);
         for part in s.split(' ') {
             let mut ch = part.chars();
             match ch.next().unwrap() {
@@ -78,89 +64,12 @@ impl std::str::FromStr for SpacedTask {
             }
         }
         let name = name_parts.join(" ");
-        let date = date.ok_or_else(|| anyhow!("No date in line. Need `#date`"))?;
         let interval = interval.ok_or_else(|| anyhow!("No interval in line. Need `@interval`"))?;
         Ok(SpacedTask {
             name,
             date,
             interval,
         })
-    }
-}
-
-fn next_larger_interval(i: usize, custom_intervals: &[usize]) -> usize {
-    for &thing in custom_intervals {
-        if thing > i {
-            return thing;
-        }
-    }
-    // We didn't find a larger interval, so use the max interval
-    custom_intervals[custom_intervals.len() - 1]
-}
-
-fn next_smaller_interval(i: usize, custom_intervals: &[usize]) -> usize {
-    let mut interval = 0;
-    for &thing in custom_intervals {
-        if thing > i {
-            break;
-        }
-        interval = thing;
-    }
-    if interval == 0 {
-        // We didn't find a smaller interval, so use the first of custom intervals
-        custom_intervals[0]
-    } else {
-        interval
-    }
-}
-
-impl SpacedTask {
-    pub fn new(title: String, date: Option<NaiveDate>) -> SpacedTask {
-        let added = SpacedTask {
-            name: title,
-            date: date.unwrap_or(Utc::now().date_naive()),
-            interval: 1,
-        };
-
-        println!("Created: {added}");
-        added
-    }
-
-    pub fn increase_interval(&mut self, custom_intervals: &[usize]) {
-        if !custom_intervals.is_empty() {
-            self.interval = next_larger_interval(self.interval, custom_intervals);
-        } else {
-            self.interval = ((self.interval as f32 * *MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
-        }
-        self.date += chrono::Duration::days(self.interval as i64);
-        println!("Updated: {self}")
-    }
-
-    pub fn repeat_interval(&mut self) {
-        self.date += chrono::Duration::days(self.interval as i64);
-        println!("Repeated: {self}")
-    }
-
-    pub fn reduce_interval(&mut self, custom_intervals: &[usize]) {
-        if !custom_intervals.is_empty() {
-            self.interval = next_smaller_interval(self.interval, custom_intervals);
-        } else {
-            self.interval = ((self.interval as f32 / *MODIFIER).ceil() as usize).min(*MAX_INTERVAL);
-        }
-        self.date += chrono::Duration::days(self.interval as i64);
-        println!("Hard updated {self}")
-    }
-
-    pub fn reset(&mut self, custom_intervals: &[usize]) {
-        self.interval = *custom_intervals.first().unwrap_or(&1);
-        self.date += chrono::Duration::days(self.interval as i64);
-        println!("Reset {self}")
-    }
-}
-
-impl std::fmt::Display for SpacedTask {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} @{} #{}", self.name, self.date, self.interval)
     }
 }
 
