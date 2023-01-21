@@ -39,7 +39,6 @@ impl std::str::FromStr for SpacedTask {
         let mut date = None;
         let mut interval = None;
         let parts: Vec<&str> = s.split(' ').collect();
-        dbg!(parts);
         for part in s.split(' ') {
             let mut ch = part.chars();
             match ch.next().unwrap() {
